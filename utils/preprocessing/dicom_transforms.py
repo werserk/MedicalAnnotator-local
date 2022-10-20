@@ -14,6 +14,7 @@ def window_image(img, window_center, window_width, intercept, slope, inverted=Fa
         img_min = img.min()
         img_max = img.max()
     img = (img - img_min) / (img_max - img_min) * 255.0
+    img = np.array(img, dtype=np.uint8)
     return img
 
 
@@ -59,11 +60,13 @@ def equalize_hist(image):
     return image
 
 
-def dicom2image(scan, equalize=False):
+def dicom2image(scan, raw=False, equalize=False):
     windowing = get_windowing(scan)
     image = scan.pixel_array
-    image = window_image(image, *windowing)
-    image = np.array(image, dtype=np.uint8)
+    if not raw:
+        image = window_image(image, *windowing)
     if equalize:
         image = equalize_hist(image)
+    if raw:
+        return image, windowing
     return image

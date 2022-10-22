@@ -100,7 +100,9 @@ class SelectionWindow:
         #     self.mask = flood_mask
 
     def _mouse_callback(self, event, x, y, flags, *userdata):
-        if event == cv2.EVENT_LBUTTONDOWN:
+
+        # Floodfilling
+        if event == cv2.EVENT_LBUTTONDBLCLK:
             self.last_x, self.last_y = x, y
             modifier = flags & (ALT_KEY + SHIFT_KEY)
             if modifier == SHIFT_KEY:
@@ -108,7 +110,8 @@ class SelectionWindow:
             else:
                 self.coords = [(x, y)]
             self._floodfill(flags)
-        if event == 10:
+
+        if event == cv2.EVENT_MOUSEWHEEL:
             if flags > 0:
                 cv2.setTrackbarPos("Tolerance", self.name,
                                    min(255, cv2.getTrackbarPos("Tolerance", self.name) + 1))

@@ -1,7 +1,5 @@
 from window import *
 import cv2
-import pydicom
-import utils.preprocessing.dicom_transforms as dt
 
 if __name__ == "__main__":
     dicom_path = 'test_data/liver_001.dcm'

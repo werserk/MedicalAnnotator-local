@@ -1,4 +1,4 @@
-import cv2
+from cv2 import cv2
 import numpy as np
 
 
@@ -20,13 +20,15 @@ def transform_to_contours(image):
 
 
 def remove_small_dots(image):
-    ret, binary_map = cv2.threshold(image, 127, 255, 0)
+    binary_map = image.copy()
+    binary_map = 255 - binary_map  # invert
     nlabels, labels, stats, centroids = cv2.connectedComponentsWithStats(binary_map, None, None, None, 8, cv2.CV_32S)
     areas = stats[1:, cv2.CC_STAT_AREA]
     result = np.zeros(labels.shape, np.uint8)
     for i in range(nlabels - 1):
-        if areas[i] >= 100:
-            result[labels == i + 1] = 255
+        if areas[i] <= 10:
+            result[labels == i + 1] = 1
+    result = cv2.bitwise_or(result, image)
     return result
 
 

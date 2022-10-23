@@ -2,6 +2,7 @@ from cv2 import cv2
 import numpy as np
 import pydicom
 import utils.preprocessing.dicom_transforms as dt
+import utils.preprocessing.marking as mkg
 from .constants import *
 
 
@@ -27,6 +28,7 @@ class SelectionWindow:
         """
         # Читаем DICOM
         self.survey, self.image, self.base_windowing = self.read_survey(path)
+        self.blurred_image = mkg.denoise(self.image, power=7)
         self.image_shape = self.image.shape[:2]  # размеры изображения
         self.mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска с разметкой
         self.flood_mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска с разметкой объекта заливкой
@@ -77,7 +79,9 @@ class SelectionWindow:
         """Разметка заливкой."""
         self.flood_mask = np.zeros(self.image_shape, dtype=np.uint8)
         all_contours = find_exterior_contours(self.positive_mask)
-        image = np.array(self.image.copy() // 2, dtype=np.uint8)
+        # TODO: Сейчас шаг tolerance - 2, потому что floodfill, похоже, не поддерживает ничего кроме uint8
+        # TODO: Необходимо избавиться от этого
+        image = np.array(self.blurred_image.copy() // 2, dtype=np.uint8)
         image[self.mask == 2] = 255
         for contours in all_contours:
             for coordinates in contours:
@@ -94,6 +98,7 @@ class SelectionWindow:
                 cv2.floodFill(image, _flood_mask, (xc, yc), 0, self.tolerance, self.tolerance, self._flood_fill_flags)
                 flood_mask = _flood_mask[1:-1, 1:-1].copy()
                 self.flood_mask = cv2.bitwise_or(self.flood_mask, flood_mask)
+        self.flood_mask = mkg.remove_small_dots(self.flood_mask)
         self._update_image()
 
     def _apply_mask(self, image, mask, color=(255, 255, 255)):

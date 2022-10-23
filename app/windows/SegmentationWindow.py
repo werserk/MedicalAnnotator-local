@@ -18,6 +18,7 @@ class SegmentationWindow(BaseWindow):
     def __init__(self, path):
         super(SegmentationWindow, self).__init__(path)
         self.mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска с разметкой
+        self.ui_mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска для отображения курсора
         self.brush_size = 5  # толщина кисти
         self._draw_flag = False  # рисуем ли
         self._erase_flag = False  # стираем ли
@@ -38,27 +39,39 @@ class SegmentationWindow(BaseWindow):
 
     def _update_image(self):
         """Обновляет изображение и заново его отрисовывает."""
-        image = self._apply_mask(self.image, self.positive_mask, color=COLOR_GREEN)
-        image = self._apply_mask(image, self.negative_mask, color=COLOR_RED)
+        # Получаем маски и контуры
+        positive_mask, positive_contours = self.apply_mask(self.positive_mask, color=COLOR_GREEN)
+        negative_mask, negative_contours = self.apply_mask(self.negative_mask, color=COLOR_RED)
+        _, cursor_contours = self.apply_mask(self.ui_mask, color=COLOR_WHITE)
+
+        # Складываем маски и накладываем на изображение
+        image = cv2.addWeighted(self.image, 0.75, positive_mask + negative_mask, 0.25, 0)
+
+        # Рисуем поверх контуры
+        image = cv2.drawContours(image, positive_contours, -1, color=COLOR_GREEN, thickness=1)
+        image = cv2.drawContours(image, negative_contours, -1, color=COLOR_RED, thickness=1)
+        image = cv2.drawContours(image, cursor_contours, -1, color=COLOR_WHITE, thickness=1)
+
         cv2.imshow(self.name, image)
 
-    def _apply_mask(self, image, mask, color=(255, 255, 255)):
+    def apply_mask(self, mask, color=(255, 255, 255)):
         """Накладывает маску на изображение и возвращает его."""
         # Находим контуры маски
         contours = find_exterior_contours(mask)
 
         # Накладываем маску и её контуры
-        viz = image.copy()
+        viz = np.zeros(self.image.shape, dtype=np.uint8)
         viz = cv2.drawContours(viz, contours, -1, color=color, thickness=-1)
-        viz = cv2.addWeighted(self.image, 0.75, viz, 0.25, 0)
-        viz = cv2.drawContours(viz, contours, -1, color=color, thickness=1)
-        return viz
+
+        return viz, contours
 
     def _draw_circle(self, x, y):
         if self._draw_flag:
             cv2.circle(self.mask, (x, y), self.brush_size, COLOR_POSITIVE, -1)
         elif self._erase_flag:
             cv2.circle(self.mask, (x, y), self.brush_size, COLOR_NEGATIVE, -1)
+        self.ui_mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска для отображения курсора
+        cv2.circle(self.ui_mask, (x, y), self.brush_size, 1, 2)
         self._update_image()
 
     def _mouse_callback(self, event, x, y, flags, *userdata):
@@ -82,10 +95,7 @@ class SegmentationWindow(BaseWindow):
 
         # Передвижение мыши
         if event == cv2.EVENT_MOUSEMOVE:  # Движение мыши
-            if self._draw_flag:  # Если рисуем
-                self._draw_circle(x, y)
-            elif self._erase_flag:  # Если стираем
-                self._draw_circle(x, y)
+            self._draw_circle(x, y)
 
     @property
     def positive_mask(self):

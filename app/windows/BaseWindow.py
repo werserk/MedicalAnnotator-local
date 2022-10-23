@@ -71,6 +71,7 @@ class BaseWindow:
     def show(self):
         """Отображает окно."""
         self._update_image()
+        print(f"{self.__class__.__name__} is currently working")
         print("Press [Q] or [ESC] to close the window.")
         while True:
             key = cv2.waitKey() & 0xFF

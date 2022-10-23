@@ -16,8 +16,8 @@ def find_exterior_contours(img):
 
 
 class SelectionWindow:
-    name = 'Медицинский разметчик'
-    connectivity = 4
+    name = 'Medical annotator'
+    connectivity = 4  # количество пикселей для усреднения вокруг стартового пикслея
     _flood_fill_flags = (connectivity | cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY | 255 << 8)
 
     def __init__(self, path):
@@ -33,14 +33,13 @@ class SelectionWindow:
 
         # Динамические значения, которые будет изменять врач во время разметки
         self.windowing = self.base_windowing.copy()  # Значения для windowing'а
-        self.coordinates = []  # координаты покрашенных пикселей
-        self.tolerance = (20,) * 3  # максимальное отклонение значения пикселя при разметке заливкой
+        self.tolerance = (10,) * 3  # максимальное отклонение значения пикселя при разметке заливкой
         self.brush_size = 5  # толщина кисти
 
         # Флаги
         self._draw_flag = False  # рисуем ли
         self._erase_flag = False  # стираем ли
-        self._floodfill_flag = True  # активирована ли маска заливки
+        self._floodfill_flag = False  # активирована ли маска заливки
 
         # Инициализация окна и виджетов
         self._init_window()
@@ -61,7 +60,7 @@ class SelectionWindow:
     def _init_widgets(self):
         """Инициализирует виджеты"""
         # Слайдеры
-        cv2.createTrackbar("Tolerance", self.name, self.tolerance[0], 255, self._tolerance_callback)
+        cv2.createTrackbar("Tolerance", self.name, self.tolerance[0], 127, self._tolerance_callback)
         cv2.createTrackbar("WC", self.name, self.windowing[0], 2048, self._wc_callback)
         cv2.createTrackbar("WW", self.name, self.windowing[1], 4096, self._ww_callback)
         cv2.createTrackbar("brush size", self.name, self.brush_size, 20, self._brush_size_callback)
@@ -74,17 +73,27 @@ class SelectionWindow:
         self.image = dt.window_image(self.image, *self.windowing)
         self.image = cv2.cvtColor(self.image, cv2.COLOR_GRAY2BGR)
 
-    def _floodfill(self, flags):
+    def _floodfill(self):
         """Разметка заливкой."""
-        if len(self.coordinates) == 0:
-            return
         self.flood_mask = np.zeros(self.image_shape, dtype=np.uint8)
-        for x, y in self.coordinates:
-            image = np.array(self.image.copy(), dtype=np.uint8)
-            _flood_mask = np.zeros((self.image_shape[0] + 2, self.image_shape[1] + 2), dtype=np.uint8)
-            cv2.floodFill(image, _flood_mask, (x, y), 0, self.tolerance, self.tolerance, self._flood_fill_flags)
-            flood_mask = _flood_mask[1:-1, 1:-1].copy()
-            self.flood_mask = cv2.bitwise_or(self.flood_mask, flood_mask)
+        all_contours = find_exterior_contours(self.positive_mask)
+        image = np.array(self.image.copy() // 2, dtype=np.uint8)
+        image[self.mask == 2] = 255
+        for contours in all_contours:
+            for coordinates in contours:
+                x, y = coordinates[0]
+                _flood_mask = np.zeros((self.image_shape[0] + 2, self.image_shape[1] + 2), dtype=np.uint8)
+                cv2.floodFill(image, _flood_mask, (x, y), 0, self.tolerance, self.tolerance, self._flood_fill_flags)
+                flood_mask = _flood_mask[1:-1, 1:-1].copy()
+                self.flood_mask = cv2.bitwise_or(self.flood_mask, flood_mask)
+
+            centroid = contours.mean(axis=1).mean(axis=0)
+            xc, yc = int(centroid[0]), int(centroid[1])
+            if self.positive_mask[xc][yc] == 1:
+                _flood_mask = np.zeros((self.image_shape[0] + 2, self.image_shape[1] + 2), dtype=np.uint8)
+                cv2.floodFill(image, _flood_mask, (xc, yc), 0, self.tolerance, self.tolerance, self._flood_fill_flags)
+                flood_mask = _flood_mask[1:-1, 1:-1].copy()
+                self.flood_mask = cv2.bitwise_or(self.flood_mask, flood_mask)
         self._update_image()
 
     def _apply_mask(self, image, mask, color=(255, 255, 255)):
@@ -103,7 +112,7 @@ class SelectionWindow:
         """Обновляет изображение и заново его отрисовывает."""
         mask = self.positive_mask
         if self._floodfill_flag:
-            mask = cv2.bitwise_or(mask, self.flood_mask)
+            mask = cv2.bitwise_or(mask, np.array(self.flood_mask, dtype=np.uint8))
         image = self._apply_mask(self.image, mask, color=COLOR_GREEN)
         image = self._apply_mask(image, self.negative_mask, color=COLOR_RED)
         cv2.imshow(self.name, image)
@@ -158,7 +167,6 @@ class SelectionWindow:
 
         # Передвижение мыши
         if event == cv2.EVENT_MOUSEMOVE:  # Движение мыши
-            print(self._draw_flag, self._erase_flag)
             if self._draw_flag:  # Если рисуем
                 self._draw_circle(x, y)
             elif self._erase_flag:  # Если стираем
@@ -171,7 +179,7 @@ class SelectionWindow:
             self._set_tolerance(self._get_tolerance() + tolerance_increment_flag)
 
             # Разметка заливкой
-            self._floodfill(flags)
+            self._floodfill()
 
     def _keyboard_callback(self, key):
         """Обработка событий клавиатуры."""
@@ -180,6 +188,8 @@ class SelectionWindow:
             return APP_FLAG_CLOSE_WINDOW
         elif key == ord("f"):
             self._floodfill_flag = not self._floodfill_flag
+            print("Floodfill " + "activated" if self._floodfill_flag else "disabled")
+            self._floodfill()
 
     @property
     def positive_mask(self):
@@ -188,7 +198,7 @@ class SelectionWindow:
     @property
     def negative_mask(self):
         return np.array(self.mask == 2, dtype=np.uint8)
-    
+
     def show(self):
         """Отображает окно."""
         self._update_image()

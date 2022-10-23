@@ -1,13 +1,14 @@
-import cv2
+from cv2 import cv2
 import numpy as np
 import pydicom
 import utils.preprocessing.dicom_transforms as dt
 
 SHIFT_KEY = cv2.EVENT_FLAG_SHIFTKEY
 ALT_KEY = cv2.EVENT_FLAG_ALTKEY
+CLOSE_WINDOW_FLAG = 0
 
 
-def _find_exterior_contours(img):
+def find_exterior_contours(img):
     # Находим контуры объектов разметки
     ret = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if len(ret) == 2:
@@ -20,19 +21,21 @@ def _find_exterior_contours(img):
 class SelectionWindow:
     name = 'Медицинский разметчик'
     connectivity = 4
+    _flood_fill_flags = (connectivity | cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY | 255 << 8)
 
     def __init__(self, path):
         """
-        Основное окно для Медицинского разметчика
+        Основное окно для Медицинского разметчика.
         :param path: DICOM путь для чтения и разметки
         """
         # Читаем DICOM
-        self.survey, self.img, self.base_windowing = self.read_img(path)
-        self.img_shape = self.img.shape[:2]  # размеры изображения
-        self.mask = np.zeros(self.img_shape, dtype=np.uint8)  # пустая маска
-        self._flood_mask = np.zeros((self.img_shape[0] + 2, self.img_shape[1] + 2),
+        self.survey, self.image, self.base_windowing = self.read_survey(path)
+        self.image_shape = self.image.shape[:2]  # размеры изображения
+        self.mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска по которой рисовали
+        self.flood_mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска с разметкой заливкой
+        self._flood_mask = np.zeros((self.image_shape[0] + 2, self.image_shape[1] + 2),
                                     dtype=np.uint8)  # временная маска для разметки заливкой
-        self._flood_fill_flags = (self.connectivity | cv2.FLOODFILL_FIXED_RANGE | cv2.FLOODFILL_MASK_ONLY | 255 << 8)
+        self._floodfill_flag = True
 
         # Динамические значения, которые будет изменять врач во время разметки
         self.windowing = self.base_windowing.copy()  # Значения для windowing'а
@@ -45,7 +48,7 @@ class SelectionWindow:
         self._init_widgets()
 
     @staticmethod
-    def read_img(path):
+    def read_survey(path):
         """Чтение DICOM исследования. Возвращает объект DICOM, исследование и значения windowing'а"""
         survey = pydicom.dcmread(path)
         img, base_windowing = dt.dicom2image(survey, equalize=False, raw=True)
@@ -68,19 +71,19 @@ class SelectionWindow:
         cv2.setMouseCallback(self.name, self._mouse_callback)
 
     def _update_windowing(self):
-        self.img, _ = dt.dicom2image(self.survey, equalize=False, raw=True)
-        self.img = dt.window_image(self.img, *self.windowing)
-        self.img = cv2.cvtColor(self.img, cv2.COLOR_GRAY2BGR)
+        self.image, _ = dt.dicom2image(self.survey, equalize=False, raw=True)
+        self.image = dt.window_image(self.image, *self.windowing)
+        self.image = cv2.cvtColor(self.image, cv2.COLOR_GRAY2BGR)
 
     def _wc_callback(self, pos):
         self.windowing[0] = pos
         self._update_windowing()
-        self._update()
+        self._update_image()
 
     def _ww_callback(self, pos):
         self.windowing[1] = pos
         self._update_windowing()
-        self._update()
+        self._update_image()
 
     def _brush_size_callback(self, pos):
         self.brush_size = pos
@@ -92,12 +95,11 @@ class SelectionWindow:
         """Разметка заливкой."""
         if len(self.coordinates) == 0:
             return
-        self.mask = np.zeros(self.img_shape, dtype=np.uint8)
-
+        self.flood_mask = np.zeros(self.image_shape, dtype=np.uint8)
         for x, y in self.coordinates:
             self._flood_mask[:] = 0
             cv2.floodFill(
-                self.img,
+                self.image,
                 self._flood_mask,
                 (x, y),
                 0,
@@ -106,7 +108,7 @@ class SelectionWindow:
                 self._flood_fill_flags,
             )
             flood_mask = self._flood_mask[1:-1, 1:-1].copy()
-            self.mask = cv2.bitwise_or(self.mask, flood_mask)
+            self.flood_mask = cv2.bitwise_or(self.flood_mask, flood_mask)
 
     def _get_tolerance(self):
         return cv2.getTrackbarPos("Tolerance", self.name)
@@ -136,24 +138,35 @@ class SelectionWindow:
             self._floodfill(flags)
 
         # Обновляем разметку
-        self._update()
+        self._update_image()
 
-    def _update(self):
+    def _update_image(self):
         """Обновляет изображение и заново его отрисовывает."""
-        viz = self.img.copy()
-        contours = _find_exterior_contours(self.mask)
+        viz = self.image.copy()
+        mask = self.mask
+        if self._floodfill_flag:
+            mask = cv2.bitwise_or(mask, self.flood_mask)
+        contours = find_exterior_contours(mask)
         viz = cv2.drawContours(viz, contours, -1, color=(255,) * 3, thickness=-1)
-        viz = cv2.addWeighted(self.img, 0.75, viz, 0.25, 0)
+        viz = cv2.addWeighted(self.image, 0.75, viz, 0.25, 0)
         viz = cv2.drawContours(viz, contours, -1, color=(255,) * 3, thickness=1)
 
         cv2.imshow(self.name, viz)
 
+    def _keyboard_callback(self, key):
+        if key in (ord("q"), ord("\x1b")):
+            cv2.destroyWindow(self.name)
+            return CLOSE_WINDOW_FLAG
+        elif key == ord("f"):
+            self._floodfill_flag = not self._floodfill_flag
+
     def show(self):
         """Отображает окно."""
-        self._update()
-        print("Press [q] or [esc] to close the window.")
+        self._update_image()
+        print("Press [Q] or [ESC] to close the window.")
+        print("Press [F] to activate/disable floodfill mask")
         while True:
-            k = cv2.waitKey() & 0xFF
-            if k in (ord("q"), ord("\x1b")):
-                cv2.destroyWindow(self.name)
-                break
+            key = cv2.waitKey() & 0xFF
+            traceback = self._keyboard_callback(key)
+            if traceback == CLOSE_WINDOW_FLAG:
+                return

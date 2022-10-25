@@ -94,7 +94,7 @@ class SegmentationWindow(BaseWindow):
             self._erase_flag = False  # Теперь мы не стираем
 
         # Передвижение мыши
-        if event == cv2.EVENT_MOUSEMOVE:  # Движение мыши
+        if event == cv2.EVENT_MOUSEMOVE:
             self._draw_circle(x, y)
 
     @property

@@ -1,6 +1,6 @@
 from cv2 import cv2
 import numpy as np
-import utils.preprocessing.marking as mkg
+from app import utils as mkg
 from app.constants import *
 from app.windows import SegmentationWindow
 from app.windows.SegmentationWindow import find_exterior_contours

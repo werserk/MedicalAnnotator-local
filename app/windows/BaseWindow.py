@@ -1,6 +1,6 @@
 from cv2 import cv2
 import pydicom
-import utils.preprocessing.dicom_transforms as dt
+from app import utils as dt
 from app.constants import *
 
 

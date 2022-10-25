@@ -2,7 +2,7 @@ from app.windows import *
 from cv2 import cv2
 
 if __name__ == "__main__":
-    dicom_path = 'test_data/liver_001.dcm'
+    dicom_path = '../test_data/liver_001.dcm'
 
     window = DistanceMeasureWindow(dicom_path)
 

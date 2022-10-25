@@ -1,9 +1,11 @@
 from cv2 import cv2
 import numpy as np
-from app import utils as mkg
+
 from app.constants import *
 from app.windows import SegmentationWindow
-from app.windows.SegmentationWindow import find_exterior_contours
+
+from utils.preprocessing.image_transforms import denoise, remove_small_dots
+from utils.analysis.contours import find_exterior_contours
 
 
 class FloodFillWindow(SegmentationWindow):
@@ -18,7 +20,7 @@ class FloodFillWindow(SegmentationWindow):
         super(FloodFillWindow, self).__init__(path)
 
         # Читаем DICOM
-        self.blurred_image = mkg.denoise(self.image, power=7)
+        self.blurred_image = denoise(self.image, power=7)
         self.flood_mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска с разметкой объекта заливкой
 
         # Динамические значения, которые будет изменять врач во время разметки
@@ -78,7 +80,7 @@ class FloodFillWindow(SegmentationWindow):
             if self.positive_mask[xc][yc] == 1:  # Если центр является размеченным (а то может быть кольцо)
                 flood_mask = self._single_floodfill(image, xc, yc, tolerance)  # Заливка
                 self.flood_mask = cv2.bitwise_or(self.flood_mask, flood_mask)  # Объединяем с ранее созданными масками
-        self.flood_mask = mkg.remove_small_dots(self.flood_mask)  # Убираем мелкие точки
+        self.flood_mask = remove_small_dots(self.flood_mask)  # Убираем мелкие точки
         self._update_image()
 
     def _update_image(self):

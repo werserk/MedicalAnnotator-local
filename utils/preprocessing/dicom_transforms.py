@@ -3,7 +3,7 @@ import numpy as np
 import pydicom as dicom
 
 
-def window_image(img, window_center, window_width, intercept, slope, inverted=False):
+def apply_windowing(img, window_center, window_width, intercept, slope, inverted=False):
     img = (img * slope + intercept)  # for translation adjustments given in the dicom file.
     img_min = window_center - window_width // 2  # minimum HU level
     img_max = window_center + window_width // 2  # maximum HU level
@@ -64,7 +64,7 @@ def dicom2image(scan, raw=False, equalize=False):
     windowing = get_windowing(scan)
     image = scan.pixel_array
     if not raw:
-        image = window_image(image, *windowing)
+        image = apply_windowing(image, *windowing)
     if equalize:
         image = equalize_hist(image)
     if raw:

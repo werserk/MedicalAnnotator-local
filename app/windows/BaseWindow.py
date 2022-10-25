@@ -1,6 +1,6 @@
 from cv2 import cv2
 import pydicom
-from app import utils as dt
+from utils.preprocessing.dicom_transforms import dicom2image, apply_windowing
 from app.constants import *
 
 
@@ -26,8 +26,8 @@ class BaseWindow:
     def read_survey(path):
         """Чтение DICOM исследования. Возвращает объект DICOM, исследование и значения windowing'а"""
         survey = pydicom.dcmread(path)
-        img, base_windowing = dt.dicom2image(survey, equalize=False, raw=True)
-        img = dt.window_image(img, *base_windowing)
+        img, base_windowing = dicom2image(survey, equalize=False, raw=True)
+        img = apply_windowing(img, *base_windowing)
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         return survey, img, base_windowing
 
@@ -48,8 +48,8 @@ class BaseWindow:
         self._update_image()
 
     def _update_windowing(self):
-        self.image, _ = dt.dicom2image(self.survey, equalize=False, raw=True)
-        self.image = dt.window_image(self.image, *self.windowing)
+        self.image, _ = dicom2image(self.survey, equalize=False, raw=True)
+        self.image = apply_windowing(self.image, *self.windowing)
         self.image = cv2.cvtColor(self.image, cv2.COLOR_GRAY2BGR)
 
     def _update_image(self):

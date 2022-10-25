@@ -4,7 +4,7 @@ import numpy as np
 from app.constants import *
 from app.windows import BaseWindow
 
-from utils.analysis import find_exterior_contours
+from utils.analysis import find_contours
 
 
 class SegmentationWindow(BaseWindow):
@@ -15,6 +15,8 @@ class SegmentationWindow(BaseWindow):
         self.brush_size = 5  # толщина кисти
         self._draw_flag = False  # рисуем ли
         self._erase_flag = False  # стираем ли
+        self._sub_tool = 0  # Если 0, то ластик. Если 1, то анти-кисть
+        self._contour_fill_type = 0  # Если 0, то контур не заполняется. Если 1, заполняется
 
         # Инициализация окна и виджетов
         if type(self) is SegmentationWindow:
@@ -25,10 +27,18 @@ class SegmentationWindow(BaseWindow):
         """Инициализирует виджеты."""
         super(SegmentationWindow, self)._init_widgets()
         cv2.createTrackbar("brush size", self.name, self.brush_size, 20, self._brush_size_callback)
+        cv2.createTrackbar("erase/anti-paint", self.name, 0, 1, self._sub_tool_change_callback)
+        cv2.createTrackbar("fill contour/not", self.name, 0, 1, self._contour_fill_type_change_callback)
         cv2.setMouseCallback(self.name, self._mouse_callback)
 
     def _brush_size_callback(self, pos):
         self.brush_size = pos
+
+    def _sub_tool_change_callback(self, pos):
+        self._sub_tool = pos
+
+    def _contour_fill_type_change_callback(self, pos):
+        self._contour_fill_type = pos
 
     def _update_image(self):
         """Обновляет изображение и заново его отрисовывает."""
@@ -50,7 +60,7 @@ class SegmentationWindow(BaseWindow):
     def apply_mask(self, mask, color=(255, 255, 255)):
         """Накладывает маску на изображение и возвращает его."""
         # Находим контуры маски
-        contours = find_exterior_contours(mask)
+        contours = find_contours(mask, flag=cv2.RETR_TREE if self._contour_fill_type == 0 else cv2.RETR_EXTERNAL)
 
         # Накладываем маску и её контуры
         viz = np.zeros(self.image.shape, dtype=np.uint8)
@@ -61,7 +71,9 @@ class SegmentationWindow(BaseWindow):
     def _draw_circle(self, x, y):
         if self._draw_flag:
             cv2.circle(self.mask, (x, y), self.brush_size, COLOR_POSITIVE, -1)
-        elif self._erase_flag:
+        elif self._erase_flag and self._sub_tool == 0:
+            cv2.circle(self.mask, (x, y), self.brush_size, COLOR_EMPTY, -1)
+        elif self._erase_flag and self._sub_tool == 1:
             cv2.circle(self.mask, (x, y), self.brush_size, COLOR_NEGATIVE, -1)
         self.ui_mask = np.zeros(self.image_shape, dtype=np.uint8)  # маска для отображения курсора
         cv2.circle(self.ui_mask, (x, y), self.brush_size, 1, 2)

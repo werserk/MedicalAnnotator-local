@@ -5,7 +5,7 @@ from app.constants import *
 from app.windows import SegmentationWindow
 
 from utils.preprocessing.image_transforms import denoise, remove_small_dots
-from utils.analysis.contours import find_exterior_contours
+from utils.analysis.contours import find_contours
 
 
 class FloodFillWindow(SegmentationWindow):
@@ -59,7 +59,7 @@ class FloodFillWindow(SegmentationWindow):
         self.flood_mask = np.zeros(self.image_shape, dtype=np.uint8)
 
         # Получаем контуры всех объектов
-        all_contours = find_exterior_contours(self.positive_mask)
+        all_contours = find_contours(self.positive_mask)
 
         # Переводим в [0..1] из-за особенностей функции floodfill
         tolerance = (self.tolerance / 1000,) * 3

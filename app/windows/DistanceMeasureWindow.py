@@ -48,7 +48,6 @@ class DistanceMeasureWindow(BaseWindow):
             self._update_image()
 
     def _move_line(self, delta_x, delta_y):
-        print(self.lines[self._line_index])
         if self._point_index is None:
             points = self.lines[self._line_index]
             self.lines[self._line_index] = [self._move_point(points[0], delta_x, delta_y),
@@ -56,7 +55,6 @@ class DistanceMeasureWindow(BaseWindow):
         else:
             point = self.lines[self._line_index][self._point_index]
             self.lines[self._line_index][self._point_index] = self._move_point(point, delta_x, delta_y)
-        print(self.lines[self._line_index])
 
     def _move_point(self, point, delta_x, delta_y):
         return point[0] - delta_x, point[1] - delta_y

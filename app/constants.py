@@ -16,3 +16,7 @@ COLOR_CURSOR = 3
 
 # Some sizes
 CURSOR_SIZE = 3
+
+# Types
+TYPE_POINT = 0
+TYPE_LINE = 1

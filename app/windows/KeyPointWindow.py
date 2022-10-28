@@ -40,13 +40,14 @@ class KeyPointWindow(BaseWindow):
             self._remove_point()
         if event == cv2.EVENT_MOUSEMOVE:
             if self._lbutton_pressed and self.point_index is not None:  # Если нажата
-                delta_x = self.x - x
-                delta_y = self.y - y
-                self.points[self.point_index] = (self.points[self.point_index][0] - delta_x,
-                                                 self.points[self.point_index][1] - delta_y)
+                self._move_point(self.x - x, self.y - y)
             self.x = x
             self.y = y
             self._update_image()
+
+    def _move_point(self, delta_x, delta_y):
+        self.points[self.point_index] = (self.points[self.point_index][0] - delta_x,
+                                         self.points[self.point_index][1] - delta_y)
 
     def _update_image(self):
         image = self.image.copy()

@@ -39,7 +39,7 @@ class DistanceMeasureWindow(BaseWindow):
         if event == cv2.EVENT_LBUTTONUP:
             self._lbutton_pressed = False
         if event == cv2.EVENT_RBUTTONDOWN:
-            self._remove_dot()
+            self._remove_point()
         if event == cv2.EVENT_MOUSEMOVE:
             if self._lbutton_pressed and self._line_index is not None:
                 self._move_line(self.x - x, self.y - y)
@@ -97,8 +97,7 @@ class DistanceMeasureWindow(BaseWindow):
             self.lines[-1].append((self.x, self.y))  # Иначе добавляем конец отрезка
         self._update_image()
 
-    def _remove_dot(self):
-        image = self.image.copy()
+    def _remove_point(self):
         if len(self.lines) == 0:  # Если точек нет
             return
         last_line = self.lines[-1]  # Получаем последний уставленный отрезок
@@ -110,7 +109,7 @@ class DistanceMeasureWindow(BaseWindow):
                     print(self._point_index)
                     self.lines.append([self.lines[self._line_index][1 - self._point_index]])
                 self.lines.pop(self._line_index)  # Удаляем линию
-        cv2.imshow(self.name, image)
+        self._update_image()
 
     def _find_closest_object(self, return_distance=False):
         closest_line = None

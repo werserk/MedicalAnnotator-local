@@ -24,11 +24,12 @@ class BaseWindow:
 
     @staticmethod
     def read_survey(path):
-        """Чтение DICOM исследования. Возвращает объект DICOM, исследование и значения windowing'а"""
-        survey = pydicom.dcmread(path)
-        img, base_windowing = dicom2image(survey, equalize=False, raw=True)
-        img = apply_windowing(img, *base_windowing)
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        """Чтение DICOM исследования. Возвращает объект DICOM, изображение и значения windowing'а"""
+        survey = pydicom.dcmread(path)  # Чтение DICOM
+        img, base_windowing = dicom2image(survey, equalize=False,
+                                          raw=True)  # Вытаскиваем из DICOM данные изображения и некоторые теги
+        img = apply_windowing(img, *base_windowing)  # Применяем windowing (особая нормализация в [0..255])
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)  # [H, W] -> [H, W, 3]
         return survey, img, base_windowing
 
     def _init_widgets(self):

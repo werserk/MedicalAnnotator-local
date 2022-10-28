@@ -2,7 +2,7 @@ from cv2 import cv2
 from app.constants import *
 
 
-def draw_dot(image, coordinates, color=COLOR_GREEN):
+def draw_point(image, coordinates, color=COLOR_GREEN):
     image = cv2.circle(image, coordinates, CURSOR_SIZE, color, thickness=-1)
     return image
 
